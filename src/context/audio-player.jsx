@@ -132,6 +132,7 @@ export const AudioProvider = ({ children }) => {
           </LazyMotion>
         )}
       </AudioPlayerContext.Provider>
+
       <audio
         ref={playerRef}
         className="hidden"

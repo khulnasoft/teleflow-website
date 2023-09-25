@@ -5,6 +5,7 @@ const fetch = require(`node-fetch`);
 const slash = require('slash');
 
 const redirects = require('./redirects.json');
+const getUseCases = require('./src/utils/get-use-cases');
 // const getSlugForPodcast = require('./src/utils/get-slug-for-podcast');
 
 const createContributorsPage = async ({ actions, reporter }) => {
@@ -373,6 +374,142 @@ async function createPosts({ graphql, actions }) {
 //   });
 // }
 
+async function createUseCasePages({ graphql, actions, reporter }) {
+  const { createPage } = actions;
+
+  const result = await graphql(`
+    {
+      allSanityTechnicalUseCase {
+        nodes {
+          id
+          templateType: _type
+          title
+          description
+          slug {
+            current
+          }
+          body: _rawBody
+          templateIndetifiers
+        }
+      }
+      allSanityFeatureUseCase {
+        nodes {
+          id
+          templateType: _type
+          title
+          description
+          slug {
+            current
+          }
+          body: _rawBody
+          templateIndetifiers
+        }
+      }
+
+      allSanityProvider {
+        nodes {
+          name
+          channels {
+            channel {
+              name
+              value {
+                current
+              }
+            }
+          }
+        }
+      }
+    }
+  `);
+
+  if (result.errors) {
+    throw new Error(result.errors);
+  }
+
+  try {
+    const useCases = [
+      ...result.data.allSanityTechnicalUseCase.nodes,
+      ...result.data.allSanityFeatureUseCase.nodes,
+    ];
+    const allProviders = result.data.allSanityProvider.nodes;
+
+    const useCasesWithFullData = await getUseCases(useCases, allProviders);
+    const useCaseTemplate = path.resolve('./src/templates/use-case.jsx');
+    const useCaseTemplateTypes = {
+      'technical-use-case': {
+        slug: '/technical-use-cases/',
+      },
+      'feature-use-case': {
+        slug: '/feature-use-cases/',
+      },
+    };
+
+    useCasesWithFullData.map((useCase) => {
+      const { templateType, slug } = useCase;
+
+      const parentPageUrl = useCaseTemplateTypes[templateType].slug;
+      const otherUseCases = useCasesWithFullData
+        .filter(
+          (otherUseCase) =>
+            otherUseCase.id !== useCase.id && otherUseCase.templateType === templateType
+        )
+        .map((otherUseCase) => ({
+          ...otherUseCase,
+          slug: parentPageUrl + otherUseCase.slug.current,
+        }))
+        .slice(-2);
+
+      return createPage({
+        path: `${useCaseTemplateTypes[templateType].slug}${slug.current}/`,
+        component: slash(useCaseTemplate),
+        context: {
+          ...useCase,
+          parentPageUrl,
+          otherUseCases,
+        },
+      });
+    });
+
+    const useCasesTemplate = path.resolve('./src/templates/use-cases.jsx');
+
+    createPage({
+      path: '/technical-use-cases/',
+      component: slash(useCasesTemplate),
+      context: {
+        title: 'Technical Use Cases',
+        description:
+          'Simple components and APIs for managing all communication channels  in one place: Email, SMS, Direct, and Push',
+        useCases: useCasesWithFullData.filter(
+          (useCase) => useCase.templateType === 'technical-use-case'
+        ),
+        pageMetadata: {
+          slug: '/technical-use-cases/',
+          title: 'Technical Use Cases - Novu',
+        },
+      },
+    });
+
+    createPage({
+      path: '/feature-use-cases/',
+      component: slash(useCasesTemplate),
+      context: {
+        title: 'Feature Use Cases',
+        description:
+          'Simple components and APIs for managing all communication channels  in one place: Email, SMS, Direct, and Push',
+        useCases: useCasesWithFullData.filter(
+          (useCase) => useCase.templateType === 'feature-use-case'
+        ),
+        pageMetadata: {
+          slug: '/feature-use-cases/',
+          title: 'Feature Use Cases - Novu',
+        },
+      },
+    });
+  } catch (error) {
+    reporter.panicOnBuild('Error in createUseCasePages:', error);
+  }
+}
+
 exports.createPages = async (args) => {
   const { createRedirect } = args.actions;
 
@@ -392,6 +529,7 @@ exports.createPages = async (args) => {
   await createPages(params);
   await createBlogPages(params);
   await createPosts(params);
+  await createUseCasePages(params);
 
   // TODO: to uncomment the creation of podcast pages after this link works - https://feeds.transistor.fm/sourcelife
   // await createPodcastPage(params);

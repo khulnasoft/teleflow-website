@@ -38,7 +38,7 @@
     "gatsby-source-github-api": "^1.0.0",
     "gatsby-source-rss-feed": "^1.2.2",
     "gatsby-source-sanity": "^7.9.1",
-    "gatsby-source-wordpress": "^7.13.1",
+    "gatsby-source-wordpress": "^7.13.4",
     "html-react-parser": "^5.0.11",
     "install": "^0.13.0",
     "lodash.isboolean": "^3.0.3",
